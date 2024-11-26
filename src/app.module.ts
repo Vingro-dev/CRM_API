@@ -17,13 +17,14 @@ import { DashboardModule } from './dashboard/dashboard.module';
   imports: [
     TypeOrmModule.forRoot({
       type: 'mssql',
-      host: 'localhost',
-      port: 1433,
-      username: 'sa',
-      password: 'root',
-      database: 'DevVingroCrm',
+      host: process.env.DB_HOST,
+      port: parseInt(process.env.DB_PORT, 10) || 1433,
+      username: process.env.DB_USERNAME,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_DATABASE,
       entities: [User, Attendance, Client, ClientVist, ServicesOffer],
       synchronize: true,
+      autoLoadEntities: true,
       extra: {
         trustServerCertificate: true,  // Disable SSL certificate validation
       },
