@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+    }
+
+    .email-container {
+      width: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      color: #4CAF50;
+      font-size: 24px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    p {
+      font-size: 16px;
+      color: #555555;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    ul {
+      padding: 0;
+      margin: 0 0 20px 0;
+      list-style-type: none;
+    }
+
+    ul li {
+      font-size: 16px;
+      color: #555555;
+      margin-bottom: 15px; /* Add gap between list items */
+    }
+
+    ul li:last-child {
+      margin-bottom: 0; /* Remove gap for the last item */
+    }
+
+    ul li strong {
+      color: #333333;
+    }
+
+    .button-container {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    a.button {
+      display: inline-block;
+      background-color: #4CAF50;
+      color: #ffffff;
+      text-decoration: none;
+      font-size: 16px;
+      padding: 10px 20px;
+      border-radius: 5px;
+      font-weight: bold;
+    }
+
+    a.button:hover {
+      background-color: #45a049;
+    }
+
+    .footer {
+      font-size: 14px;
+      color: #888888;
+      text-align: center;
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <h1>Welcome to Our Platform</h1>
+    <p>Hello {{name}},</p>
+
+    <p>Your account has been successfully created. Here are your login credentials:</p>
+
+    <ul>
+      <li><strong>Login ID:</strong> {{loginId}}</li>
+      <li><strong>Password:</strong> {{password}}</li>
+    </ul>
+
+    {{!-- <div class="button-container">
+      <a href="{{loginUrl}}" target="_blank" class="button">Login Here</a>
+    </div> --}}
+
+    <p>If you have any questions, feel free to contact our support team.</p>
+
+    <p>Best regards,</p>
+    <p>The Support Team</p>
+  </div>
+
+  <div class="footer">
+    {{!-- <p>&copy; {{year}} Our Platform. All rights reserved.</p> --}}
+  </div>
+</body>
+</html>
+

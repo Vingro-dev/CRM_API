@@ -1,7 +1,7 @@
 
 import { Client } from "src/client/entities/client.entity";
 import { ClientVist } from "src/client_vist/entities/client_vist.entity";
-import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
 @Entity('service_offer')
 export class ServicesOffer {
@@ -15,7 +15,7 @@ export class ServicesOffer {
     @Column()
     createdBy: number;
 
-    @Column()
+    @CreateDateColumn()
     createdAt: Date;
 
     @OneToMany(() => ClientVist, (clientVist) => clientVist.services)

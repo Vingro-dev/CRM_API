@@ -35,6 +35,11 @@ export class Attendance {
     @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
     total_hours: number;  // Store the total working hours as decimal
 
+    @Column({ nullable: true })
+    late_hours: string;
+
+    @Column({ default: false })
+    half_day: boolean;   // To store whether it's a half day
 
     @Column({ nullable: true })
     DeviceID: string;

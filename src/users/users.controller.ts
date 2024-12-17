@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -10,31 +10,65 @@ export class UsersController {
 
   @Post()
   create(@Body() createUserDto: CreateUserDto) {
+
+    console.log(createUserDto);
+
     return this.usersService.create(createUserDto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  //@UseGuards(JwtAuthGuard)
   @Get()
   findAll() {
     return this.usersService.findAll();
   }
 
 
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(+id);
   }
 
-  @UseGuards(JwtAuthGuard)
+  //@UseGuards(JwtAuthGuard)
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.update(+id, updateUserDto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.usersService.remove(+id);
   }
+
+  @Post('activeUser/:id')
+  async isActiveuser(@Param('id') id: string, @Query('mood') mood: string) {
+
+    console.log(id);
+
+    return await this.usersService.isActiveuser(Number(id), mood);
+  }
+
+
+
+  @Post('UpdateUserprofile/:id')
+  async updateUserProfile_Useronly(@Param('id') id: string, @Query('mood') mood: string, @Body() updateUserDto: any) {
+
+
+    return await this.usersService.updateUserProfile_Useronly(+id, mood, updateUserDto)
+  }
+
+
+
+  @Post('error')
+  async errorlog(@Body() updateUserDto: any) {
+
+    console.log(updateUserDto);
+
+  }
+
+
 }

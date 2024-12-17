@@ -30,6 +30,9 @@ export class CreateClientVistDto extends CreateClientDto {
     Followup_type: string;
 
     @ApiProperty()
+    CallStatus: string;
+
+    @ApiProperty()
     latitude: number;
 
     @ApiProperty()
@@ -40,4 +43,8 @@ export class CreateClientVistDto extends CreateClientDto {
 
     @ApiProperty()
     followup_Date: Date;
+
+
+    @ApiProperty()
+    Remarks: string;
 }

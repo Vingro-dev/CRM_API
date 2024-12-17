@@ -11,11 +11,17 @@ export class ServicesOfferService {
   constructor(@InjectRepository(ServicesOffer)
   private readonly ServiceRepository: Repository<ServicesOffer>) { }
 
-  async create(createServicesOfferDto: CreateServicesOfferDto) {
+  async create(createServicesOfferDto: any) {
+
     const servicename = createServicesOfferDto.servicename
     const AlreadyExits = await this.ServiceRepository.findOne({ where: { servicename } })
     if (AlreadyExits) throw new ConflictException('This Services already exists');
-    const newService = await this.ServiceRepository.create(createServicesOfferDto)
+
+    const newService = this.ServiceRepository.create({
+      servicename: createServicesOfferDto.servicename,
+      createdBy: createServicesOfferDto.user_id,
+    })
+
     return this.ServiceRepository.save(newService)
   }
 
@@ -23,11 +29,10 @@ export class ServicesOfferService {
     return this.ServiceRepository.find({});
   }
 
-  findOne(s_id: number) {
-    return this.ServiceRepository.findOne({ where: { s_id } });
-  }
 
-  async update(s_id: number, updateServicesOfferDto: UpdateServicesOfferDto) {
+  async update(s_id: number, data: any) {
+
+    console.log(s_id, data);
 
 
     const existingUser = await this.ServiceRepository.findOne({ where: { s_id } });
@@ -36,7 +41,7 @@ export class ServicesOfferService {
       throw new NotFoundException(`Service with ID ${s_id} not found`);
     }
 
-    await this.ServiceRepository.update(s_id, updateServicesOfferDto);
+    await this.ServiceRepository.update({ s_id }, { servicename: data.servicename });
 
     return `User with ID ${s_id} has been updated successfully`;
 

@@ -7,24 +7,19 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @ApiTags('services-offer')
 @Controller('services-offer')
-@UseGuards(JwtAuthGuard)
+//@UseGuards(JwtAuthGuard)
 export class ServicesOfferController {
 
   constructor(private readonly servicesOfferService: ServicesOfferService) { }
 
   @Post()
-  create(@Body() createServicesOfferDto: CreateServicesOfferDto) {
+  create(@Body() createServicesOfferDto: any) {
     return this.servicesOfferService.create(createServicesOfferDto);
   }
 
   @Get()
   findAll() {
     return this.servicesOfferService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.servicesOfferService.findOne(+id);
   }
 
   @Patch(':id')

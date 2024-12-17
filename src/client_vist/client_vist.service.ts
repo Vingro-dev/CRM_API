@@ -26,6 +26,9 @@ export class ClientVistService {
 
   async newEnquiry(data: CreateClientVistDto) {
 
+    console.log(data);
+    
+
     const existingClient = await this.clientRepository.findOne({
       where: {
         email: data.email,
@@ -69,10 +72,12 @@ export class ClientVistService {
       company_name: data.company_name,
       client_name: data.client_name,
       client_address: data.client_address,
+
       contact: data.contact,
       email: data.email,
       created_by: data.user_id,
-      services: data.services
+      services: data.services,
+
     });
 
     const savedClient = await this.clientRepository.save(newClient);
@@ -106,6 +111,8 @@ export class ClientVistService {
       longitude: data.longitude || 0,
       followup_Date: data.followup_Date,
       Status: 'P',
+      CallStatus: data.CallStatus,
+      Remarks: data.Remarks
     });
 
     const savedClientVisit = await this.ClientVistRepository.save(newClientVisit);
@@ -161,8 +168,6 @@ export class ClientVistService {
 
     // Logic for 'ClientApproval' Followup_type
     if (FollowupData.Followup_type === 'ClientApproval') {
-
-
 
 
       const newEntry = this.ClientVistRepository.create({
@@ -250,7 +255,7 @@ export class ClientVistService {
       ])
       .where('clients.created_by = :created_by', { created_by })
       .andWhere('clients.created_at BETWEEN :todayStart AND :todayEnd', { todayStart, todayEnd })
-       .orderBy('clients.created_at', 'DESC') // Adding ORDER BY clause
+      .orderBy('clients.created_at', 'DESC') // Adding ORDER BY clause
       .getRawMany();
 
     return { newClient };
