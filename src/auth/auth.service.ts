@@ -3,16 +3,22 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { UsersService } from 'src/users/users.service';
 import * as crypto from 'crypto';
-import { MailerServices } from 'src/mailer/mailer.service';  // You will need a mail service to send the OTP
+import { MailerServices } from 'src/mailer/mailer.service';
+import { format, isEqual } from 'date-fns';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { UserSession } from 'src/sessions/session.entity';
 
 @Injectable()
 export class AuthService {
     private otpCache = new Map<string, { otp: string; expiresAt: number }>();
 
     constructor(
-        private userService: UsersService,  // Inject UserService to access user data
+        private userService: UsersService,
         private jwtService: JwtService,
-        private mailerService: MailerServices, // Inject mail service to send OTP emails
+        private mailerService: MailerServices,
+        @InjectRepository(UserSession)
+        private userSessionRepository: Repository<UserSession>,
     ) { }
 
     async validateUser(email: string, password: string): Promise<any> {
@@ -30,16 +36,32 @@ export class AuthService {
         return null;
     }
 
-    async sendOtp(email: string): Promise<string> {
-        const otp = crypto.randomInt(100000, 999999).toString();  // Generate 6 digit OTP
+    async sendOtp(email: string, dob: Date): Promise<string> {
+
+        const user = await this.userService.findByEmail(email);
+        if (!user) {
+            throw new UnauthorizedException('Invalid credentials');
+        }
+        const userDobFormatted = format(new Date(user.DOB), 'yyyy-MM-dd');
+        const inputDobFormatted = format(new Date(dob), 'yyyy-MM-dd');
+
+        console.log(userDobFormatted, inputDobFormatted);
+
+        const isDobValid = isEqual(userDobFormatted, inputDobFormatted)
+
+        if (!isDobValid) {
+            throw new UnauthorizedException('Date of Birth does not match');
+        }
+
+        const otp = crypto.randomInt(100000, 999999).toString();
         const expiresAt = Date.now() + 5 * 60 * 1000;
 
-        // Cache the OTP for verification
+
         this.otpCache.set(email, { otp, expiresAt });
 
-        console.log(`OTP for ${email} cached:`, { otp, expiresAt });  // Log OTP to verify
+        console.log(`OTP for ${email} cached:`, { otp, expiresAt });
 
-        // Send OTP email to the user
+
         await this.mailerService.sendOtpEmail(email, otp);
 
         return otp;
@@ -84,12 +106,40 @@ export class AuthService {
     }
 
 
-    async login(user: any) {
-        const designation = user.designation.DesginationName;
+    async login(user: any, deviceId: string, deviceInfo: object) {
+        // Generate JWT token
         const payload = { username: user.name, sub: user.user_id };
+
+        const token = this.jwtService.sign(payload);
+
+        const designation = user.designation.DesginationName;
+
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+        //const expiresAt = new Date(Date.now() + 2 * 60 * 1000); // 1 minute from now
+
+        const session = new UserSession();
+        session.user_id = user.user_id;
+        session.token = token;
+        session.deviceId = deviceId;
+        session.deviceInfo = JSON.stringify(deviceInfo);
+        session.expiresAt = expiresAt;
+
+        await this.userSessionRepository.save(session);
+
+
+
         return {
-            access_token: this.jwtService.sign(payload),
-            userData: { userid: user.user_id, username: user.name, email: user.email, role: user.role, profile: user.profile, designation }
+            access_token: token,
+            userData: {
+                userid: user.user_id,
+                username: user.name,
+                email: user.email,
+                role: user.role,
+                designation,
+                profile:user.profile
+            },
         };
     }
+
 }

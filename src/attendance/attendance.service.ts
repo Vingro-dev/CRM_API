@@ -3,7 +3,7 @@ import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Attendance } from './entities/attendance.entity';
 import { Between, Repository } from 'typeorm';
-import { endOfDay, format, startOfDay } from 'date-fns';
+import { compareAsc, compareDesc, endOfDay, format, formatDistanceStrict, formatDistanceToNowStrict, startOfDay } from 'date-fns';
 import axios from "axios";
 import { User } from 'src/users/entities/user.entity';
 
@@ -146,9 +146,9 @@ export class AttendanceService {
   }
 
 
-  async findOne(user_id: number) {
-    const todayStart = startOfDay(new Date()); // Start of current day
-    const todayEnd = endOfDay(new Date());    // End of current day
+  async findOne(user_id: number, date: string) {
+    const todayStart = startOfDay(new Date(date));
+    const todayEnd = endOfDay(new Date(date));
 
     const existingRecord = await this.attendanceRepository.findOne({
       where: {
@@ -157,14 +157,23 @@ export class AttendanceService {
       },
     });
 
+    const currentDate = new Date().toISOString().split('T')[0];
 
     if (!existingRecord) {
-      throw new NotFoundException('No attendance record found for today.');
+      return {
+        status: currentDate === date ? '' : 'Absent',
+        formattedIntime: '',
+        formattedOuttime: '',
+        exactWorkingHours: '',
+      };
     }
 
+    // Format intime and outtime
     const formattedIntime = format(new Date(existingRecord.intime), 'dd-MM-yyyy hh:mm a');
-    const formattedOuttime = existingRecord.outime ? format(new Date(existingRecord.outime), 'dd-MM-yyyy hh:mm a') : existingRecord.outime;
-    let exactWorkingHours = '0h 0m';
+    const formattedOuttime = existingRecord.outime ? format(new Date(existingRecord.outime), 'dd-MM-yyyy hh:mm a') : 'null';
+
+    // Calculate working hours
+    let exactWorkingHours = '0h 0m 0s';
     if (existingRecord.intime && existingRecord.outime) {
       const start = new Date(existingRecord.intime).getTime();
       const end = new Date(existingRecord.outime).getTime();
@@ -175,8 +184,9 @@ export class AttendanceService {
       exactWorkingHours = `${hours}h ${minutes}m ${seconds}s`;
     }
 
+    // Return attendance record with "Present" status
     return {
-      ...existingRecord,
+      status: 'Present',
       formattedIntime,
       formattedOuttime,
       exactWorkingHours,
@@ -239,7 +249,7 @@ export class AttendanceService {
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
       );
       if (response.data && response.data.display_name) {
-        return response.data.display_name; // Human-readable address
+        return `${response.data.address.suburb} ,${response.data.address.city} ,${response.data.address.state}`; // Human-readable address
       } else {
         return null;
       }
@@ -259,26 +269,16 @@ export class AttendanceService {
     const endOfToday = new Date();
     endOfToday.setHours(23, 59, 59, 999);
 
-    // Get all employees (users with 'user' role)
+    // Get all employees
     const allEmployees = await this.userRepository.find({
       where: { role: 'user' },
     });
 
-    console.log('Number of employees:', allEmployees.length);
-
     // Fetch today's attendance
     const todaysAttendance = await this.attendanceRepository.find({
-      where: {
-        created_at: Between(startOfToday, endOfToday),
-      },
-      relations: ['user'], // Assuming 'user' relation exists for attendance
+      where: { created_at: Between(startOfToday, endOfToday) },
+      relations: ['user'],
     });
-
-    console.log('Today\'s attendance records:', todaysAttendance.length);
-
-    // if (todaysAttendance.length === 0) {
-    //   throw new NotFoundException('No attendance record found for today.');
-    // }
 
     // Track users who were present today
     const presentEmployees = todaysAttendance.map((entry) => entry.user.user_id);
@@ -289,32 +289,82 @@ export class AttendanceService {
       return checkInTime.getHours() > 9 || (checkInTime.getHours() === 9 && checkInTime.getMinutes() > 30);
     }).map((entry) => entry.user.user_id);
 
-    // Track employees who are on half-day (morning or evening)
-    const halfDayEmployees = todaysAttendance.filter((entry) => {
-      const checkInTime = new Date(entry.intime);
-      let checkOutTime = new Date(entry.outime);
 
-      // Handle cases where outime is NULL (user hasn't checked out)
-      if (!checkOutTime.getTime()) {
-        // Assuming the user worked 2 hours if outime is NULL (you can adjust this logic)
-        checkOutTime = new Date(checkInTime.getTime() + 2 * 60 * 60 * 1000); // Assuming 2 hours worked
-      }
 
-      // Calculate the total worked hours
-      const workedHours = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60); // Convert ms to hours
 
-      // Morning half-day logic: Check-in after 9:30 AM and leave before 2:00 PM (worked hours should be between 2 and 4 hours)
-      const morningHalfDay = checkInTime.getHours() >= 9 && checkInTime.getMinutes() >= 30 && checkOutTime.getHours() < 14;
+    const halfDayEmployees = todaysAttendance
+      .filter((entry) => {
+        const checkInTime = new Date(entry.intime);
+        const checkOutTime = entry.outime ? new Date(entry.outime) : null;
 
-      // Evening half-day logic: Check-in after 2:00 PM and leave before 6:30 PM (worked hours should be between 2 and 4 hours)
-      const eveningHalfDay = checkInTime.getHours() >= 14 && checkOutTime.getHours() <= 18;
+        // Convert times to the desired timezone
+        const localCheckInTime = checkInTime.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+        const localCheckOutTime = checkOutTime ? checkOutTime.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }) : null;
 
-      // Half-day if worked between 2 and 4 hours and either morning or evening half-day
-      return (morningHalfDay || eveningHalfDay) && workedHours >= 2 && workedHours <= 4;
-    }).map((entry) => entry.user.user_id);
+        console.log(localCheckInTime, localCheckOutTime, 'Check-in and Check-out Time');
 
-    // Track absent employees (those who didn't record attendance today)
-    const absentEmployees = allEmployees.filter((employee) => !presentEmployees.includes(employee.user_id))
+        // Auto half-day: No check-out and check-in between 2:00 PM - 6:00 PM
+        if (!checkOutTime) {
+          const autoHalfDay = checkInTime.getHours() >= 14 && checkInTime.getHours() < 18;
+          if (autoHalfDay) {
+            console.log('User auto half-day, user_id:', entry.user.user_id);
+            return true;
+          }
+          return false;
+        }
+
+        // Full-day condition
+        const workedHours = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
+        const fullDayCondition =
+          checkInTime.getHours() <= 9 &&
+          checkInTime.getMinutes() <= 30 &&
+          checkOutTime.getHours() >= 18 &&
+          checkOutTime.getMinutes() >= 30;
+
+        if (fullDayCondition || workedHours >= 8) {
+          console.log('Full-day employee, user_id:', entry.user.user_id);
+          return false;
+        }
+
+        // Check-out after 2:30 PM disqualifies half-day
+        if (checkOutTime.getHours() > 14 || (checkOutTime.getHours() === 14 && checkOutTime.getMinutes() > 30)) {
+          console.log('User check-out after 2:30 PM, not eligible for half-day, user_id:', entry.user.user_id);
+          return false;
+        }
+
+        // Morning Half-Day: Relaxed condition
+        const morningHalfDay =
+          checkInTime.getHours() < 14 && // Check-in before 2:00 PM
+          (checkOutTime.getHours() < 14 || (checkOutTime.getHours() === 14 && checkOutTime.getMinutes() <= 30)); // Check-out before or at 2:30 PM
+
+        const autoHalfDay = checkInTime.getHours() >= 14 && checkInTime.getHours() < 18;
+
+        console.log({
+          userId: entry.user.user_id,
+          checkInTime: localCheckInTime,
+          checkOutTime: localCheckOutTime,
+          isMorningHalfDay: morningHalfDay,
+          isAutoHalfDay: autoHalfDay,
+        });
+
+        return morningHalfDay || autoHalfDay;
+      })
+      .map((entry) => entry.user.user_id);
+
+    console.log(halfDayEmployees, 'Half-Day Employees');
+
+
+
+
+
+
+
+
+
+
+    // Track absent employees
+    const absentEmployees = allEmployees
+      .filter((employee) => !presentEmployees.includes(employee.user_id))
       .map((employee) => employee.user_id);
 
     return {
@@ -325,6 +375,9 @@ export class AttendanceService {
       halfDay: halfDayEmployees.length,
     };
   }
+
+
+
 
 
 
@@ -349,11 +402,6 @@ export class AttendanceService {
       relations: ['user'],
     });
 
-    // If there are no attendance records today, return an empty array
-    // if (todaysAttendance.length === 0) {
-    //   return [];
-    // }
-
     // Categorizing attendance data
     const presentEmployees = todaysAttendance.map((entry) => entry.user.user_id);
 
@@ -362,73 +410,134 @@ export class AttendanceService {
       return checkInTime.getHours() > 9 || (checkInTime.getHours() === 9 && checkInTime.getMinutes() > 30);
     }).map((entry) => entry.user.user_id);
 
+    // const halfDayEmployees = todaysAttendance
+    //   .filter((entry) => {
+    //     const checkInTime = new Date(entry.intime);  // Assuming this is UTC
+    //     const checkOutTime = entry.outime ? new Date(entry.outime) : null;  // Assuming this is UTC
+    //     const localCheckInTime = checkInTime.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+    //     const localCheckOutTime = checkOutTime ? checkOutTime.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }) : null;
+
+    //     if (!checkOutTime) {
+    //       const autoHalfDay = checkInTime.getHours() >= 14 && checkInTime.getHours() < 18;
+    //       if (autoHalfDay) {
+    //         return true;
+    //       }
+    //       return false;
+    //     }
+
+    //     const workedHours = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
+
+    //     const fullDayCondition =
+    //       checkInTime.getHours() <= 9 &&
+    //       checkInTime.getMinutes() <= 30 &&
+    //       checkOutTime.getHours() >= 18 &&
+    //       checkOutTime.getMinutes() >= 30;
+
+    //     if (fullDayCondition || workedHours >= 8) return false;
+
+    //     const morningHalfDay =
+    //       (checkInTime.getHours() < 9 || (checkInTime.getHours() === 9 && checkInTime.getMinutes() <= 30)) &&
+    //       (checkOutTime.getHours() < 14 || (checkOutTime.getHours() === 14 && checkOutTime.getMinutes() === 0));
+
+    //     const autoHalfDay = checkInTime.getHours() >= 14 && checkInTime.getHours() < 18;
+
+    //     if (morningHalfDay || autoHalfDay) {
+    //       return true;
+    //     }
+
+    //     return false;
+    //   })
+    //   .map((entry) => entry.user.user_id);
 
 
-    const halfDayEmployees = todaysAttendance.filter((entry) => {
-      const checkInTime = new Date(entry.intime);
-      let checkOutTime = new Date(entry.outime);
 
-      // Handle cases where outime is NULL (user hasn't checked out)
-      if (!checkOutTime.getTime()) {
-        // Assuming the user worked 2 hours if outime is NULL (you can adjust this logic)
-        checkOutTime = new Date(checkInTime.getTime() + 2 * 60 * 60 * 1000); // Assuming 2 hours worked
-      }
+    const halfDayEmployees = todaysAttendance
+      .filter((entry) => {
+        const checkInTime = new Date(entry.intime);
+        const checkOutTime = entry.outime ? new Date(entry.outime) : null;
 
-      // Calculate the total worked hours
-      const workedHours = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60); // Convert ms to hours
+        // Convert times to the desired timezone
+        const localCheckInTime = checkInTime.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+        const localCheckOutTime = checkOutTime ? checkOutTime.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }) : null;
 
-      // Morning half-day logic: Check-in after 9:30 AM and leave before 2:00 PM (worked hours should be between 2 and 4 hours)
-      const morningHalfDay = checkInTime.getHours() >= 9 && checkInTime.getMinutes() >= 30 && checkOutTime.getHours() < 14;
+        console.log(localCheckInTime, localCheckOutTime, 'Check-in and Check-out Time');
 
-      // Evening half-day logic: Check-in after 2:00 PM and leave before 6:30 PM (worked hours should be between 2 and 4 hours)
-      const eveningHalfDay = checkInTime.getHours() >= 14 && checkOutTime.getHours() <= 18;
+        // Auto half-day: No check-out and check-in between 2:00 PM - 6:00 PM
+        if (!checkOutTime) {
+          const autoHalfDay = checkInTime.getHours() >= 14 && checkInTime.getHours() < 18;
+          if (autoHalfDay) {
+            console.log('User auto half-day, user_id:', entry.user.user_id);
+            return true;
+          }
+          return false;
+        }
 
-      // Half-day if worked between 2 and 4 hours and either morning or evening half-day
-      return (morningHalfDay || eveningHalfDay) && workedHours >= 2 && workedHours <= 4;
-    }).map((entry) => entry.user.user_id);
+        // Full-day condition
+        const workedHours = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
+        const fullDayCondition =
+          checkInTime.getHours() <= 9 &&
+          checkInTime.getMinutes() <= 30 &&
+          checkOutTime.getHours() >= 18 &&
+          checkOutTime.getMinutes() >= 30;
 
+        if (fullDayCondition || workedHours >= 8) {
+          console.log('Full-day employee, user_id:', entry.user.user_id);
+          return false;
+        }
 
-    // const halfDayEmployees = todaysAttendance.filter((entry) => {
-    //   const checkInTime = new Date(entry.intime);
-    //   const checkOutTime = new Date(entry.outime);
-    //   const workedHours = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60); // Convert ms to hours
-    //   return workedHours >= 2 && workedHours <= 4;
-    // }).map((entry) => entry.user.user_id);
+        // Check-out after 2:30 PM disqualifies half-day
+        if (checkOutTime.getHours() > 14 || (checkOutTime.getHours() === 14 && checkOutTime.getMinutes() > 30)) {
+          console.log('User check-out after 2:30 PM, not eligible for half-day, user_id:', entry.user.user_id);
+          return false;
+        }
+
+        // Morning Half-Day: Relaxed condition
+        const morningHalfDay =
+          checkInTime.getHours() < 14 && // Check-in before 2:00 PM
+          (checkOutTime.getHours() < 14 || (checkOutTime.getHours() === 14 && checkOutTime.getMinutes() <= 30)); // Check-out before or at 2:30 PM
+
+        const autoHalfDay = checkInTime.getHours() >= 14 && checkInTime.getHours() < 18;
+
+        return morningHalfDay || autoHalfDay;
+      })
+      .map((entry) => entry.user.user_id);
 
     const absentEmployees = allEmployees.filter((employee) => !presentEmployees.includes(employee.user_id)).map((employee) => employee.user_id);
 
     // Function to return employee details with formatted times and late time
-    const getEmployeeDetails = (userId: number) => {
+    const getEmployeeDetails = async (userId: number) => {
       const employee = allEmployees.find(emp => emp.user_id === userId);
       const attendanceEntry = todaysAttendance.find(entry => entry.user.user_id === userId);
 
+      if (!employee) return null;
 
-
-      if (!employee) return null; // If employee doesn't exist, return null
-
-      let intime = null, outime = null, lateTime = null;
+      let intime = null, outime = null, lateTime = null, locationName = null;
 
       if (attendanceEntry) {
         intime = new Date(attendanceEntry.intime);
         outime = attendanceEntry.outime ? new Date(attendanceEntry.outime) : null;
 
         // Calculate late time
-        const checkInTime = new Date(intime);  // Create a copy of intime
+        const checkInTime = new Date(intime);
         const referenceTime = new Date(checkInTime);
-        referenceTime.setHours(9, 30, 0, 0);  // Set to 9:30 AM
+        referenceTime.setHours(9, 30, 0, 0);
 
-        // Calculate the late time difference if checkInTime is after 9:30 AM
         if (checkInTime > referenceTime) {
-          const lateDifferenceInMillis = checkInTime.getTime() - referenceTime.getTime();  // Difference in ms
-          const lateHours = Math.floor(lateDifferenceInMillis / (1000 * 60 * 60));  // Get hours
-          const lateMinutes = Math.floor((lateDifferenceInMillis % (1000 * 60 * 60)) / (1000 * 60));  // Get minutes
-          lateTime = `${lateHours}h ${lateMinutes}m`;
+          const lateDifferenceInMillis = checkInTime.getTime() - referenceTime.getTime();
+          const lateHours = Math.floor(lateDifferenceInMillis / (1000 * 60 * 60));
+          const lateMinutes = Math.floor((lateDifferenceInMillis % (1000 * 60 * 60)) / (1000 * 60));
+          lateTime = `${lateHours}h ${lateMinutes} m`;
+        }
+
+
+        console.log(attendanceEntry.latitude, attendanceEntry.longitude, 'attendanceEntry.latitude');
+
+        if (attendanceEntry.latitude && attendanceEntry.longitude) {
+          locationName = await this.getLocationName(attendanceEntry.latitude, attendanceEntry.longitude);
         }
       }
 
       if (attendanceEntry) {
-        // Return the details
-
         return {
           userId: employee.user_id,
           name: employee.name,
@@ -437,43 +546,43 @@ export class AttendanceService {
           outime: outime ? format(outime, 'h:mm a') : null,
           lateTime: lateTime || null,
           profile: employee.profile,
+          locationName: locationName
         };
       } else {
-
-
-        // If no attendance entry, employee is absent
         return {
           name: employee.name,
           designation: employee.designation.DesginationName,
           intime: null,
           outime: null,
           lateTime: null,
+          locationName: null
         };
       }
     };
 
     // Get employee details based on filter type
     let filteredEmployees: any[] = [];
-    const filter = filtertype.toLowerCase()
+    const filter = filtertype.toLowerCase();
     switch (filter) {
       case 'present':
-        filteredEmployees = presentEmployees.map(userId => getEmployeeDetails(userId)).filter(details => details !== null);
+        filteredEmployees = await Promise.all(presentEmployees.map(userId => getEmployeeDetails(userId)));
         break;
       case 'late':
-        filteredEmployees = latePunchEmployees.map(userId => getEmployeeDetails(userId)).filter(details => details !== null);
+        filteredEmployees = await Promise.all(latePunchEmployees.map(userId => getEmployeeDetails(userId)));
         break;
       case 'halfday':
-        filteredEmployees = halfDayEmployees.map(userId => getEmployeeDetails(userId)).filter(details => details !== null);
+        filteredEmployees = await Promise.all(halfDayEmployees.map(userId => getEmployeeDetails(userId)));
         break;
       case 'absent':
-        filteredEmployees = absentEmployees.map(userId => getEmployeeDetails(userId)).filter(details => details !== null);
+        filteredEmployees = await Promise.all(absentEmployees.map(userId => getEmployeeDetails(userId)));
         break;
       default:
-        filteredEmployees = [];  // Return an empty array if the filter type is unknown
+        filteredEmployees = [];
     }
 
-    return filteredEmployees;
+    return filteredEmployees.filter(details => details !== null);
   }
+
 
 
 

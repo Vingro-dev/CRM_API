@@ -63,12 +63,11 @@ export class UsersController {
 
 
 
-  @Post('error')
-  async errorlog(@Body() updateUserDto: any) {
 
-    console.log(updateUserDto);
-
+  @Post('update-online-status')
+  async updateOnlineStatus(@Body() body: { userId: number, isOnline: boolean }) {
+    await this.usersService.updateOnlineStatus(body.userId, body.isOnline);
+    return { success: true };
   }
-
 
 }

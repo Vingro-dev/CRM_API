@@ -6,15 +6,17 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { UsersModule } from 'src/users/users.module';
 import { MailerModule } from 'src/mailer/mailer.module';
+import { SessionsModule } from 'src/sessions/sessions.module';
 
 @Module({
   imports: [
     UsersModule,
     PassportModule,
     MailerModule,
+    SessionsModule,
     JwtModule.register({
       secret: 'your_secret_key',  // Replace with your secret key
-      signOptions: { expiresIn: '1h' },  // Token expires in 1 hour
+      signOptions: { expiresIn: '7d' },  // Token expires in 1 hour
     }),
   ],
   providers: [AuthService, JwtStrategy],

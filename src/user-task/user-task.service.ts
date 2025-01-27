@@ -46,8 +46,13 @@ export class UserTaskService {
     return response;
   }
 
-  update(id: number, updateUserTaskDto: UpdateUserTaskDto) {
-    return `This action updates a #${id} userTask`;
+  update(id: number, updateUserTaskDto: any) {
+    const updateData = this.UserTaskRepository.update({ taskid: id }, {
+      Taskname: updateUserTaskDto.Taskname,
+      TaskStatus: updateUserTaskDto.TaskStatus,
+      Description: updateUserTaskDto.Description,
+    })
+    return updateData
   }
 
   async remove(taskid: number) {

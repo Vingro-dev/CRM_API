@@ -26,7 +26,7 @@ export class UserTaskController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateUserTaskDto: UpdateUserTaskDto) {
+  update(@Param('id') id: string, @Body() updateUserTaskDto: any) {
     return this.userTaskService.update(+id, updateUserTaskDto);
   }
 

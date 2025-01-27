@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Body, UnauthorizedException, BadRequestException, Headers } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/ResetPassword.dto';
@@ -7,26 +7,45 @@ import { ResetPasswordDto } from './dto/ResetPassword.dto';
 export class AuthController {
     constructor(private authService: AuthService) { }
 
-    // User Login
-    @Post('login')
-    async login(@Body() logindto: LoginDto) {
-        const user = await this.authService.validateUser(logindto.email, logindto.password);
+    // // User Login
+    // @Post('login')
+    // async login(@Body() logindto: LoginDto) {
+    //     const user = await this.authService.validateUser(logindto.email, logindto.password);
 
+    //     if (!user) {
+    //         throw new UnauthorizedException('Invalid credentials');
+    //     }
+    //     return this.authService.login(user);
+    // }
+
+
+    @Post('login')
+    async login(
+        @Body() loginDto: { email: string; password: string }, @Headers('device-id') deviceId: string, @Headers('device-info') deviceInfo: string,
+    ) {
+
+
+        if (!deviceId || !deviceInfo) {
+            throw new UnauthorizedException('Device information is required');
+        }
+
+        const user = await this.authService.validateUser(loginDto.email, loginDto.password);
         if (!user) {
             throw new UnauthorizedException('Invalid credentials');
         }
-        return this.authService.login(user);
+
+        return this.authService.login(user, deviceId, JSON.parse(deviceInfo));
     }
 
     // Send OTP to user email
     @Post('send-otp')
-    async sendOtp(@Body() logindto: LoginDto) {
-
+    async sendOtp(@Body() logindto: any) {
 
         console.log(logindto);
 
-        const { email } = logindto;
-        const otp = await this.authService.sendOtp(email);
+
+        const { email, dob } = logindto;
+        const otp = await this.authService.sendOtp(email, dob);
         return { message: 'OTP sent to your email', otp };
     }
 

@@ -221,4 +221,29 @@ export class UsersService {
 
   }
 
+
+
+  async updateOnlineStatus(userId: number, isOnline: boolean) {
+
+
+
+    console.log('api called for Update Online Status');
+
+
+    try {
+      const user = await this.UserRepository.findOne({ where: { user_id: userId } });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+      user.isOnline = isOnline;
+      user.lastOnline = isOnline ? new Date() : new Date();
+      await this.UserRepository.save(user);
+      return { success: true, message: `User ${isOnline ? 'is now online' : 'is offline'}` };
+    } catch (error) {
+      console.error(error);
+      throw new Error('Error updating online status');
+    }
+  }
+
 }

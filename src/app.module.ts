@@ -1,66 +1,81 @@
-import { Module } from '@nestjs/common';
-import { AttendanceModule } from './attendance/attendance.module';
-import { ClientModule } from './client/client.module';
-import { ClientVistModule } from './client_vist/client_vist.module';
+import { Module, MiddlewareConsumer } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule } from '@nestjs/config';
+import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
+import { MailerModule } from '@nestjs-modules/mailer';
+import { join } from 'path';
+
+// Entities
+import { User } from './users/entities/user.entity';
+import { UserSession } from './sessions/session.entity';
 import { Attendance } from './attendance/entities/attendance.entity';
 import { Client } from './client/entities/client.entity';
 import { ClientVist } from './client_vist/entities/client_vist.entity';
-import { UsersModule } from './users/users.module';
-import { User } from './users/entities/user.entity';
-import { AuthModule } from './auth/auth.module';
-import { ServicesOfferModule } from './services_offer/services_offer.module';
 import { ServicesOffer } from './services_offer/entities/services_offer.entity';
-import { DashboardModule } from './dashboard/dashboard.module';
-import { ConfigModule } from '@nestjs/config';
-import { UserdesginationModule } from './userdesgination/userdesgination.module';
-import { NotificationModule } from './notification/notification.module';
 import { Notification } from './notification/entities/notification.entity';
 import { Userdesgination } from './userdesgination/entities/userdesgination.entity';
-import { CompanymasterModule } from './companymaster/companymaster.module';
 import { Companymaster } from './companymaster/entities/companymaster.entity';
-import { MailerModule } from '@nestjs-modules/mailer';  // Import the MailerModule
-import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
-import { join } from 'path';
-import { MailService } from './utility/Email/mail.service';
+
+// Modules
+import { AttendanceModule } from './attendance/attendance.module';
+import { ClientModule } from './client/client.module';
+import { ClientVistModule } from './client_vist/client_vist.module';
+import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
+import { ServicesOfferModule } from './services_offer/services_offer.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { UserdesginationModule } from './userdesgination/userdesgination.module';
+import { NotificationModule } from './notification/notification.module';
+import { CompanymasterModule } from './companymaster/companymaster.module';
 import { UserTaskModule } from './user-task/user-task.module';
 
+// Middleware & Services
+import { SessionMiddleware } from './common/middleware/session.middleware';
+import { SessionsService } from './sessions/sessions.service';
+import { MailService } from './utility/Email/mail.service';
+import { ConversationModule } from './conversation/conversation.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot(),
+
+    ConfigModule.forRoot(), // Load environment variables
     TypeOrmModule.forRoot({
-      type: 'mssql',
+      type: 'mysql',
       host: process.env.DB_HOST,
-      port: parseInt(process.env.DB_PORT, 10) || 1433, // Default port 1433 if not set
+      port: parseInt(process.env.DB_PORT),
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_DATABASE,
-      entities: [User, Attendance, Client, ClientVist, ServicesOffer, Notification, Userdesgination, Companymaster],
-      synchronize: true,  // Set to false in production
-      autoLoadEntities: true,
+      synchronize: process.env.DB_SYNCHRONIZE === 'true',
+      //logging: process.env.DB_LOGGING === 'true',
+      entities: [__dirname + '/**/*.entity{.ts,.js}'],
+      ssl: process.env.DB_SSL === 'true',
       extra: {
-        trustServerCertificate: true,  // Disable SSL certificate validation
+        trustServerCertificate: true,
       },
     }),
-    TypeOrmModule.forFeature([User, Attendance, Client, ClientVist, ServicesOffer, Notification, Userdesgination, Companymaster]),
+    TypeOrmModule.forFeature([
+      User, UserSession, Attendance, Client, ClientVist,
+      ServicesOffer, Notification, Userdesgination, Companymaster,
+    ]),
+
+    // Application Modules
+    AttendanceModule,
     ClientModule,
     ClientVistModule,
     UsersModule,
     AuthModule,
     ServicesOfferModule,
     DashboardModule,
-    AttendanceModule,
     UserdesginationModule,
     NotificationModule,
     CompanymasterModule,
+    UserTaskModule,
 
-
-
-    // Add MailerModule and configure it with SMTP settings
+    // Mailer Module for email functionality
     MailerModule.forRoot({
       transport: {
-        host: process.env.SMTP_HOST, // SMTP server host (e.g., smtp.gmail.com)
+        host: process.env.SMTP_HOST,
         port: parseInt(process.env.SMTP_PORT, 10) || 587,
         secure: process.env.SMTP_SECURE === 'true',
         auth: {
@@ -80,11 +95,14 @@ import { UserTaskModule } from './user-task/user-task.module';
       },
     }),
 
-
-
-    UserTaskModule,
+    ConversationModule,
   ],
   controllers: [],
-  providers: [MailService],
+  providers: [MailService, SessionsService],
+  exports: [SessionsService],
 })
-export class AppModule { }
+export class AppModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(SessionMiddleware).forRoutes('*');
+  }
+}

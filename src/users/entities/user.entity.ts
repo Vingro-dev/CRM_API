@@ -1,18 +1,27 @@
+import {
+    Column,
+    CreateDateColumn,
+    Entity,
+    PrimaryGeneratedColumn,
+    OneToMany,
+    ManyToOne,
+    JoinColumn,
+} from "typeorm";
 import { IsOptional } from "class-validator";
 import { Attendance } from "src/attendance/entities/attendance.entity";
-import { Companymaster } from "src/companymaster/entities/companymaster.entity";
 import { UserTask } from "src/user-task/entities/user-task.entity";
 import { Userdesgination } from "src/userdesgination/entities/userdesgination.entity";
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, OneToMany, ManyToOne, JoinColumn } from "typeorm";
+import { Companymaster } from "src/companymaster/entities/companymaster.entity";
+import { UserSession } from "src/sessions/session.entity";
+import { Conversation } from "src/conversation/entities/conversation.entity";
 
 export enum Gender {
-    MALE = 'male',
-    FEMALE = 'female',
+    MALE = "male",
+    FEMALE = "female",
 }
 
-@Entity('users')
+@Entity("users")
 export class User {
-
     @PrimaryGeneratedColumn()
     user_id: number;
 
@@ -37,7 +46,7 @@ export class User {
     @Column({ nullable: true })
     address: string;
 
-    @Column({ type: 'varchar', length: 10, nullable: true })
+    @Column({ type: "varchar", length: 10, nullable: true })
     gender: Gender;
 
     @IsOptional()
@@ -59,17 +68,32 @@ export class User {
     @OneToMany(() => UserTask, (usertask) => usertask.user)
     usertask: Attendance[];
 
-    @ManyToOne(() => Userdesgination, (designation) => designation.users, { eager: true })
-    @JoinColumn({ name: 'des_id' })
+    @ManyToOne(() => Userdesgination, (designation) => designation.users, {
+        eager: true,
+    })
+    @JoinColumn({ name: "des_id" })
     designation: Userdesgination;
 
     @Column({ nullable: true })
     des_id: number;
 
     @ManyToOne(() => Companymaster, (company) => company.users, { eager: true })
-    @JoinColumn({ name: 'cm_id' })
+    @JoinColumn({ name: "cm_id" })
     company: Companymaster;
 
     @Column({ nullable: true })
     cm_id: number;
+
+    @OneToMany(() => UserSession, (session) => session.user, { cascade: true })
+    sessions: UserSession[];
+
+    // New column: Relationship with conversations
+    @OneToMany(() => Conversation, (conversation) => conversation.user)
+    conversations: Conversation[];
+
+    @Column({ default: false })
+    isOnline: boolean;
+
+    @Column({ type: 'time', nullable: true })
+    lastOnline: Date;
 }
