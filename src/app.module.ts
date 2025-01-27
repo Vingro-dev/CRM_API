@@ -38,9 +38,9 @@ import { ConversationModule } from './conversation/conversation.module';
 @Module({
   imports: [
 
-    ConfigModule.forRoot(), // Load environment variables
+    ConfigModule.forRoot(),
     TypeOrmModule.forRoot({
-      type: 'mysql',
+      type: process.env.DB_TYPE as any,
       host: process.env.DB_HOST,
       port: parseInt(process.env.DB_PORT),
       username: process.env.DB_USERNAME,
@@ -52,6 +52,7 @@ import { ConversationModule } from './conversation/conversation.module';
       ssl: process.env.DB_SSL === 'true',
       extra: {
         trustServerCertificate: true,
+        charset: process.env.DB_TYPE === 'mysql' ? 'utf8mb4' : undefined
       },
     }),
     TypeOrmModule.forFeature([

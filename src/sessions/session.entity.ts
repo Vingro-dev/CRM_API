@@ -1,5 +1,6 @@
 import { User } from 'src/users/entities/user.entity';
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, JoinColumn } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
 
 @Entity('user_sessions')
 export class UserSession {
@@ -10,24 +11,30 @@ export class UserSession {
     @JoinColumn({ name: 'user_id' })
     user: User;
 
-    @Column({ type: 'varchar', length: 255 })
+    @Column()
     deviceId: string;
 
-    @Column({ type: 'longtext' })  // Works for both MySQL and MSSQL
+
+    @Column({
+        type: process.env.DB_TYPE === 'mssql' ? 'nvarchar' : 'longtext',
+        length: process.env.DB_TYPE === 'mssql' ? 'max' : undefined
+    })
+
+    @Column({ type: 'nvarchar', length: 'max' })
     deviceInfo: string;
 
-    @Column({ type: 'varchar', length: 255, nullable: true })
+    @Column({ nullable: true })
     ipAddress: string;
 
-    @Column({ type: 'varchar', length: 500 })
+    @Column()
     token: string;
 
-    @CreateDateColumn({ type: 'timestamp' })
+    @CreateDateColumn()
     createdAt: Date;
 
-    @Column({ type: 'timestamp' })
+    @Column()
     expiresAt: Date;
 
-    @Column({ type: 'int' })
+    @Column()
     user_id: number;
 }
