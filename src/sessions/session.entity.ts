@@ -2,8 +2,16 @@ import { User } from 'src/users/entities/user.entity';
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, JoinColumn } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 
+
+console.log(process.env.DB_TYPE, 'process.env.DB_TYPE');
+
+
 @Entity('user_sessions')
 export class UserSession {
+
+
+
+
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
@@ -15,12 +23,13 @@ export class UserSession {
     deviceId: string;
 
 
-    @Column({
-        type: process.env.DB_TYPE === 'mssql' ? 'nvarchar' : 'longtext',
-        length: process.env.DB_TYPE === 'mssql' ? 'max' : undefined
-    })
+    // @Column({
+    //     type: process.env.DB_TYPE === 'mssql' ? 'nvarchar' : 'longtext',
+    //     length: process.env.DB_TYPE === 'mssql' ? 'max' : ''
+    // })
 
-    @Column({ type: 'nvarchar', length: 'max' })
+    @Column({ type: 'nvarchar'})
+
     deviceInfo: string;
 
     @Column({ nullable: true })
